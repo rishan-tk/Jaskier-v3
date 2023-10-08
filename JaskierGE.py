@@ -27,6 +27,10 @@ class JaskierGE(commands.Cog):
         self.bot = bot
         self.check_inactivity.start()
 
+    def guild_only(ctx):
+        # Check if the command was invoked in a guild (server) channel
+        return ctx.guild is not None
+
     @commands.command(name="join", help="Command to make the bot join the server which the user is connected to")
     async def join(self, ctx: commands.Context):
         try:
@@ -38,6 +42,7 @@ class JaskierGE(commands.Cog):
             logging.error(f'User is not connected to a voice channel: {e}')
 
     @commands.command(name="leave", help="Command to make the bot leave the server")
+    @commands.check(guild_only)
     async def leave(self, ctx: commands.Context):
         try:
             channel = ctx.message.guild.voice_client
@@ -50,6 +55,7 @@ class JaskierGE(commands.Cog):
 
     @commands.command(name="play", help="""Command to play a song or add a song to queue if song is already 
                                             playing\nUsage: /play (youtube-link/song-name)""")
+    @commands.check(guild_only)
     async def play(self, ctx: commands.Context, *, url):
         try:
             ctypes.util.find_library('opus')
@@ -68,6 +74,7 @@ class JaskierGE(commands.Cog):
             await self.add_to_queue(ctx, player.title)
 
     @commands.command(name='pause', help='This command pauses the song')
+    @commands.check(guild_only)
     async def pause(self, ctx: commands.Context):
         try:
             voice_client = ctx.message.guild.voice_client
@@ -79,6 +86,7 @@ class JaskierGE(commands.Cog):
             logging.error(f'An error occurred while pausing: {e}')
 
     @commands.command(name='resume', help='Resumes the song')
+    @commands.check(guild_only)
     async def resume(self, ctx: commands.Context):
         try:
             voice_client = ctx.message.guild.voice_client
@@ -91,6 +99,7 @@ class JaskierGE(commands.Cog):
             logging.error(f'An error occurred while resuming: {e}')
 
     @commands.command(name='skip', help='Skip current song')
+    @commands.check(guild_only)
     async def stop(self, ctx: commands.Context):
         try:
             voice_client = ctx.message.guild.voice_client
@@ -103,6 +112,7 @@ class JaskierGE(commands.Cog):
             logging.error(f'An error occurred while skipping: {e}')
 
     @commands.command(name="queue", help="View the queue")
+    @commands.check(guild_only)
     async def view_queue(self, ctx: commands.Context):
         try:
             queue_items = [list(item) for item in self.queue.items()]
@@ -114,6 +124,7 @@ class JaskierGE(commands.Cog):
             logging.error(f'An error occurred while viewing the queue: {e}')
 
     @commands.command(name="move", help="Move song in the queue(queue no  queue postion)")
+    @commands.check(guild_only)
     async def move_song(self, ctx: commands.Context, queue_num: int, queue_pos: int):
         try:
             if queue_num == queue_pos:
@@ -137,6 +148,7 @@ class JaskierGE(commands.Cog):
             logging.error(f'An error occurred while moving a song in the queue: {e}')
 
     @commands.command(name="remove", help="Remove song in the queue(Song No)")
+    @commands.check(guild_only)
     async def remove_song(self, ctx: commands.Context, song_num: int):
         try:
             if song_num > len(self.queue):
@@ -153,13 +165,19 @@ class JaskierGE(commands.Cog):
         except Exception as e:
             logging.error(f'An error occurred while removing a song from the queue: {e}')
 
-    # Event listener for the on_command event
+    # Event listener for the on_message event
     @commands.Cog.listener()
     async def on_message(self, message):
+        # Update the last interaction time
         if message.author == self.bot.user:
             return
         else:
-            self.last_interaction_time = datetime.utcnow()  # Update the last interaction time
+            self.last_interaction_time = datetime.utcnow()
+
+    @commands.Cog.listener()
+    async def on_command_error(self, ctx, error):
+        if isinstance(error, commands.CheckFailure):
+            await ctx.send("Sorry, you don't have permission to use this command.")
 
     # Helper Methods
     async def add_to_queue(self, ctx: commands.Context, title):
