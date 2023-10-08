@@ -20,22 +20,22 @@ logging.basicConfig(
 class JaskierGE(commands.Cog):
     queue = {}  # To store the song queue {("Queue No(int)" : "Title(str)")}
     current_id = 0  # Current index of song in the queue
-    last_interaction_time = datetime.utcnow()  # Initialize with the current time
+    last_interaction_time = datetime.utcnow()  # Initialize with the current time (auto-updated upon message to bot)
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.check_inactivity.start()
 
-    @commands.command(name="join", help="Tells the bot to join")
+    @commands.command(name="join", help="Command to make the bot join the server which the user is connected to")
     async def join(self, ctx: commands.Context):
-        self.last_interaction_time = datetime.utcnow()  # Update the last interaction time
         try:
             channel = ctx.message.author.voice.channel
             await channel.connect()
         except Exception as e:
-            logging.error(f'You are not connected to a voice channel: {e}')
+            await ctx.send("You are not connected to a voice channel")
+            logging.error(f'User is not connected to a voice channel: {e}')
 
-    @commands.command(name="leave", help="Tells the bot to leave")
+    @commands.command(name="leave", help="Command to make the bot leave the server")
     async def leave(self, ctx: commands.Context):
         try:
             channel = ctx.message.guild.voice_client
@@ -46,9 +46,9 @@ class JaskierGE(commands.Cog):
         except Exception as e:
             logging.error(f'An error occurred while leaving a voice channel: {e}')
 
-    @commands.command(name="play")
+    @commands.command(name="play", help="""Command to play a song or add a song to queue if song is already 
+                                            playing\nUsage: /play (youtube-link/song-name)""")
     async def play(self, ctx: commands.Context, *, url):
-        self.last_interaction_time = datetime.utcnow()  # Update the last interaction time
         try:
             ctypes.util.find_library('opus')
         except Exception as e:
@@ -67,7 +67,6 @@ class JaskierGE(commands.Cog):
 
     @commands.command(name='pause', help='This command pauses the song')
     async def pause(self, ctx: commands.Context):
-        self.last_interaction_time = datetime.utcnow()  # Update the last interaction time
         try:
             voice_client = ctx.message.guild.voice_client
             if voice_client.is_playing():
@@ -79,7 +78,6 @@ class JaskierGE(commands.Cog):
 
     @commands.command(name='resume', help='Resumes the song')
     async def resume(self, ctx: commands.Context):
-        self.last_interaction_time = datetime.utcnow()  # Update the last interaction time
         try:
             voice_client = ctx.message.guild.voice_client
             if voice_client.is_paused():
@@ -92,7 +90,6 @@ class JaskierGE(commands.Cog):
 
     @commands.command(name='skip', help='Skip current song')
     async def stop(self, ctx: commands.Context):
-        self.last_interaction_time = datetime.utcnow()  # Update the last interaction time
         try:
             voice_client = ctx.message.guild.voice_client
             JaskierGE.last_interaction_time = datetime.utcnow()  # Update the last interaction time
@@ -105,7 +102,6 @@ class JaskierGE(commands.Cog):
 
     @commands.command(name="queue", help="View the queue")
     async def view_queue(self, ctx: commands.Context):
-        self.last_interaction_time = datetime.utcnow()  # Update the last interaction time
         try:
             queue_items = [list(item) for item in self.queue.items()]
             output = t2a(header=["Queue No", "Song"],
@@ -117,7 +113,6 @@ class JaskierGE(commands.Cog):
 
     @commands.command(name="move", help="Move song in the queue(queue no  queue postion)")
     async def move_song(self, ctx: commands.Context, queue_num: int, queue_pos: int):
-        self.last_interaction_time = datetime.utcnow()  # Update the last interaction time
         try:
             if queue_num == queue_pos:
                 await ctx.send("FUCK OFF GERALT!!!")
@@ -141,7 +136,6 @@ class JaskierGE(commands.Cog):
 
     @commands.command(name="remove", help="Remove song in the queue(Song No)")
     async def remove_song(self, ctx: commands.Context, song_num: int):
-        self.last_interaction_time = datetime.utcnow()  # Update the last interaction time
         try:
             if song_num > len(self.queue):
                 await ctx.send("FUCK OFF GERALT!!!")
@@ -156,6 +150,14 @@ class JaskierGE(commands.Cog):
             await ctx.send("Removed " + removed_song + " from queue")
         except Exception as e:
             logging.error(f'An error occurred while removing a song from the queue: {e}')
+
+    # Event listener for the on_command event
+    @commands.Cog.listener()
+    async def on_message(self, message):
+        if message.author == self.bot.user:
+            return
+        else:
+            self.last_interaction_time = datetime.utcnow()  # Update the last interaction time
 
     # Helper Methods
     async def add_to_queue(self, ctx: commands.Context, title):
