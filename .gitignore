@@ -178,5 +178,6 @@ cython_debug/
 # Support for Project snippet scope
 
 # End of https://www.toptal.com/developers/gitignore/api/python,visualstudiocode
-LightsailDefaultKey-eu-west-2.pem
+Jaskier-DMB.pem
 poetry.lock
+ffmpeg.exe
