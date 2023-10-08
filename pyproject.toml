@@ -2,7 +2,7 @@
 name = "JaskierGE"
 version = "0.0.1"
 description = "First Edition of Shiet"
-authors = ["rishan <rishan1996@hotmail.co.uk>"]
+authors = ["Rish"]
 
 [tool.poetry.dependencies]
 python = "^3.8"
