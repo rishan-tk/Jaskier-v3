@@ -180,3 +180,4 @@ cython_debug/
 # End of https://www.toptal.com/developers/gitignore/api/python,visualstudiocode
 LightsailDefaultKey-eu-west-2.pem
 poetry.lock
+ffmpeg.exe
