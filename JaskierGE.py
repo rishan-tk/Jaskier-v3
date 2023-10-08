@@ -21,6 +21,7 @@ class JaskierGE(commands.Cog):
     queue = {}  # To store the song queue {("Queue No(int)" : "Title(str)")}
     current_id = 0  # Current index of song in the queue
     last_interaction_time = datetime.utcnow()  # Initialize with the current time (auto-updated upon message to bot)
+    channel_id = ""
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -30,6 +31,7 @@ class JaskierGE(commands.Cog):
     async def join(self, ctx: commands.Context):
         try:
             channel = ctx.message.author.voice.channel
+            self.channel_id = channel.id
             await channel.connect()
         except Exception as e:
             await ctx.send("You are not connected to a voice channel")
@@ -211,6 +213,7 @@ class JaskierGE(commands.Cog):
             try:
                 for voice_channel in self.bot.voice_clients:
                     if voice_channel.is_connected():
+                        await self.bot.get_channel(self.channel_id).send("Bot has been inactive for too long, disconnecting now")
                         await voice_channel.disconnect()
             except Exception as e:
                 logging.error(f'Bot could not auto-disconnect: {e}')
