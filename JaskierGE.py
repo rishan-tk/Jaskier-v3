@@ -22,8 +22,6 @@ logging.basicConfig(
 
 class JaskierGE(commands.Cog):
     musicQueue = MusicQueue()
-    queue = {}  # To store the song queue {("Queue No(int)" : "Title(str)")}
-    current_id = 0  # Current index of song in the queue
     last_interaction_time = datetime.utcnow()  # Initialize with the current time (auto-updated upon message to bot)  # noqa
     channel_id = ""
 
@@ -65,19 +63,7 @@ class JaskierGE(commands.Cog):
             if not discord.opus.is_loaded():
                 logging.error(f'Opus failed to load: {e}')
 
-        try:
-            async with ctx.typing():
-                player = await YTDLSource.from_url(url, loop=self.bot.loop,
-                                                   stream=True)
-                ctx.voice_client.play(player,
-                                      after=lambda  # After audio is finished playing run the lambda function  # noqa
-                                      e: logging.error('Player error: %s' % e) if e  # Log error if it occurs  # noqa
-                                      else asyncio.run_coroutine_threadsafe(self.play_next(ctx), loop=self.bot.loop))  # noqa
-            await ctx.send('Now playing: {}'.format(player.title))
-        except discord.ClientException as e:
-            await self.add_to_queue(ctx, player.title[:50])
-        except Exception as e:
-            logging.error(f'An error occurred while playing: {e}')
+        await self.play_song(ctx, url)
 
     @commands.command(name='pause', help='This command pauses the song')
     @commands.check(guild_only)
@@ -121,43 +107,29 @@ class JaskierGE(commands.Cog):
     @commands.command(name="queue", help="View the queue")
     @commands.check(guild_only)
     async def view_queue(self, ctx: commands.Context):
-        if len(self.queue) == 0:
-            await ctx.send("Queue is currently empty.")
-            return
-
         try:
-            queue_items = [list(item) for item in self.queue.items()]
-            output = t2a(header=["Queue No", "Song"],
-                         body=queue_items,
-                         first_col_heading=True)
-            await ctx.send(f"Queue:\n```\n{output}\n```")
+            await ctx.send(self.musicQueue.view_queue())
         except Exception as e:
             logging.error(f'An error occurred while viewing the queue: {e}')
 
-    @commands.command(name="move", help="Move song in the queue(queue no queue position)")  # noqa
+    @commands.command(name="move", help="Move song in the queue(song no  new position)")  # noqa
     @commands.check(guild_only)
     async def move_song(self, ctx: commands.Context,
-                        queue_num: int, queue_pos: int):
-        if queue_num == queue_pos:
-            await ctx.send("You are referencing the same song twice.")
-            return
+                        song_index: int, new_pos: int):
+        new_pos -= 1
+        song_index -= 1
+
         try:
-            queue_items = []
-            for id, title in list(self.queue.items()):
-                if id == queue_pos:
-                    if queue_pos < queue_num:
-                        queue_items.append(self.queue[queue_num])
-                        queue_items.append(title)
-                    elif queue_pos > queue_num:
-                        queue_items.append(title)
-                        queue_items.append(self.queue[queue_num])
-                    continue
-                if id == queue_num:
-                    continue
-                queue_items.append(title)
-            await self.repopulate_queue(queue_items)
-            await ctx.send("Moved " + str(self.queue[queue_pos]) +
-                           " to queue position: " + str(queue_pos))
+            if song_index == new_pos:
+                await ctx.send("You are referencing the same song twice.")
+                return
+
+            song_moved = self.musicQueue.move_song_i(song_index, new_pos)
+
+            if song_moved is True:
+                await ctx.send("Moved to queue position: " + str(new_pos+1))
+            else:
+                await ctx.send(song_moved)  # Return error message
         except Exception as e:
             logging.error(f'An error occurred while moving a song \
                           in the queue: {e}')
@@ -165,17 +137,14 @@ class JaskierGE(commands.Cog):
     @commands.command(name="remove", help="Remove song in the queue(Song No)")
     @commands.check(guild_only)
     async def remove_song(self, ctx: commands.Context, song_num: int):
+        song_num -= 1  # Numbers shown to user are larger by 1
         try:
-            if song_num > len(self.queue):
+            if song_num > self.musicQueue.size() or song_num < 0:
                 await ctx.send("Number longer than queue length")
-            queue_items = []
-            removed_song = ""
-            for id, title in list(self.queue.items()):
-                if id == song_num:
-                    removed_song = title
-                    continue
-                queue_items.append(title)
-            self.repopulate_queue(queue_items)
+                return
+
+            removed_song = self.musicQueue.queue[song_num]
+            self.musicQueue.remove_from_queue_i(song_num)
             await ctx.send("Removed " + removed_song + " from queue")
         except Exception as e:
             logging.error(f'An error occurred while removing a song \
@@ -201,54 +170,36 @@ class JaskierGE(commands.Cog):
     async def add_to_queue(self, ctx: commands.Context, title):
         try:
             await self.musicQueue.add_to_queue(title)
-            queuelen = len(self.queue)
-            if queuelen >= 0:
-                self.queue[queuelen] = title
-                await ctx.send("Added to queue: {}".format(title))
+            await ctx.send("Added to queue: {}".format(title))
         except Exception as e:
             logging.error(f'An error occurred while adding to the queue: {e}')
 
     async def play_next(self, ctx: commands.Context):
         try:
-            if self.musicQueue.queue_size() > 0:
+            if self.musicQueue.size() > 0:
                 songName = self.musicQueue.remove_next()
-
-            if len(self.queue) > 0:
-                url = self.queue[0]
-                async with ctx.typing():
-                    player = await YTDLSource.from_url(url, loop=self.bot.loop,
-                                                       stream=True)
-                    ctx.voice_client.play(player,
-                                      after=lambda  # After audio is finished playing run the lambda function  # noqa
-                                      e: logging.error('Player error: %s' % e) if e  # Log error if it occurs  # noqa
-                                      else asyncio.run_coroutine_threadsafe(self.play_next(ctx), loop=self.bot.loop))  # noqa
-                await ctx.send('Now playing: {}'.format(player.title))
-                await self.remove_just_played()
+                await self.play_song(ctx, songName)
             else:
                 await ctx.send("Queue is currently empty")
         except Exception as e:
             logging.error(f'An error occurred while playing the \
                           next song: {e}')
 
-    async def remove_just_played(self):
+    async def play_song(self, ctx, songName):
         try:
-            queue_items = []
-            for id, title in list(self.queue.items()):
-                if id == 0:
-                    continue
-                queue_items.append(title)
-            await self.repopulate_queue(queue_items)
+            async with ctx.typing():
+                player = await YTDLSource.from_url(songName,
+                                                   loop=self.bot.loop,
+                                                   stream=True)
+                ctx.voice_client.play(player,
+                                    after=lambda  # After audio is finished playing run the lambda function  # noqa
+                                    e: logging.error('Player error: %s' % e) if e  # Log error if it occurs  # noqa
+                                    else asyncio.run_coroutine_threadsafe(self.play_next(ctx), loop=self.bot.loop))  # noqa
+                await ctx.send('Now playing: {}'.format(player.title))
+        except discord.ClientException as e:
+            await self.add_to_queue(ctx, player.title[:50])
         except Exception as e:
-            logging.error(f'An error occurred while removing just played: {e}')
-
-    async def repopulate_queue(self, new_queue: list):
-        try:
-            self.queue.clear()
-            ids = [*range(len(new_queue))]
-            self.queue = dict(zip(ids, new_queue))
-        except Exception as e:
-            logging.error(f'An error occurred while repopulating \
-                            the queue: {e}')
+            logging.error(f'An error occurred while playing: {e}')
 
     async def join_server(self, ctx):
         try:
