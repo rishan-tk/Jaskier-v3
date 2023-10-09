@@ -1,12 +1,12 @@
 from discord.ext import commands, tasks
 import discord
 from YTDLSource import YTDLSource
-from table2ascii import table2ascii as t2a
 import asyncio
 import ctypes
 import ctypes.util
 import logging  # Import the logging module
 from datetime import datetime, timedelta
+from table2ascii import table2ascii as t2a
 
 # Configure logging
 logging.basicConfig(
@@ -20,7 +20,7 @@ logging.basicConfig(
 class JaskierGE(commands.Cog):
     queue = {}  # To store the song queue {("Queue No(int)" : "Title(str)")}
     current_id = 0  # Current index of song in the queue
-    last_interaction_time = datetime.utcnow()  # Initialize with the current time (auto-updated upon message to bot)
+    last_interaction_time = datetime.utcnow()  # Initialize with the current time (auto-updated upon message to bot)  # noqa
     channel_id = ""
 
     def __init__(self, bot: commands.Bot):
@@ -31,7 +31,7 @@ class JaskierGE(commands.Cog):
         # Check if the command was invoked in a guild (server) channel
         return ctx.guild is not None
 
-    @commands.command(name="join", help="Command to make the bot join the server which the user is connected to")
+    @commands.command(name="join", help="Command to make the bot join the server which the user is connected to")  # noqa
     async def join(self, ctx: commands.Context):
         try:
             channel = ctx.message.author.voice.channel
@@ -41,7 +41,7 @@ class JaskierGE(commands.Cog):
             await ctx.send("You are not connected to a voice channel")
             logging.error(f'User is not connected to a voice channel: {e}')
 
-    @commands.command(name="leave", help="Command to make the bot leave the server")
+    @commands.command(name="leave", help="Command to make the bot leave the server")  # noqa
     @commands.check(guild_only)
     async def leave(self, ctx: commands.Context):
         try:
@@ -51,10 +51,10 @@ class JaskierGE(commands.Cog):
             else:
                 await ctx.send("The bot is not connected to a voice channel.")
         except Exception as e:
-            logging.error(f'An error occurred while leaving a voice channel: {e}')
+            logging.error(f'An error occurred while leaving a voice\
+                          channel: {e}')
 
-    @commands.command(name="play", help="""Command to play a song or add a song to queue if song is already 
-                                            playing\nUsage: /play (youtube-link/song-name)""")
+    @commands.command(name="play", help="Command to play a song or add a song to queue if song is already playing\nUsage: /play (youtube-link/song-name)")  # noqa
     @commands.check(guild_only)
     async def play(self, ctx: commands.Context, *, url):
         try:
@@ -65,13 +65,17 @@ class JaskierGE(commands.Cog):
 
         try:
             async with ctx.typing():
-                player = await YTDLSource.from_url(url, loop=self.bot.loop, stream=True)
-                ctx.voice_client.play(player, after=lambda e: print('Player error: %s' % e)
-                                        if e else asyncio.run_coroutine_threadsafe(self.play_next(ctx), loop=self.bot.loop))
+                player = await YTDLSource.from_url(url, loop=self.bot.loop,
+                                                   stream=True)
+                ctx.voice_client.play(player,
+                                      after=lambda  # After audio is finished playing run the lambda function  # noqa
+                                      e: logging.error('Player error: %s' % e) if e  # Log error if it occurs  # noqa
+                                      else asyncio.run_coroutine_threadsafe(self.play_next(ctx), loop=self.bot.loop))  # noqa
             await ctx.send('Now playing: {}'.format(player.title))
+        except discord.ClientException as e:
+            await self.add_to_queue(ctx, player.title[:50])
         except Exception as e:
             logging.error(f'An error occurred while playing: {e}')
-            await self.add_to_queue(ctx, player.title)
 
     @commands.command(name='pause', help='This command pauses the song')
     @commands.check(guild_only)
@@ -81,7 +85,8 @@ class JaskierGE(commands.Cog):
             if voice_client.is_playing():
                 voice_client.pause()
             else:
-                await ctx.send("The bot is not playing anything at the moment.")
+                await ctx.send("The bot is not playing anything at \
+                               the moment.")
         except Exception as e:
             logging.error(f'An error occurred while pausing: {e}')
 
@@ -103,29 +108,35 @@ class JaskierGE(commands.Cog):
     async def stop(self, ctx: commands.Context):
         try:
             voice_client = ctx.message.guild.voice_client
-            JaskierGE.last_interaction_time = datetime.utcnow()  # Update the last interaction time
+            JaskierGE.last_interaction_time = datetime.utcnow()  # Update the last interaction time  # noqa
             if voice_client.is_playing():
                 voice_client.stop()
             else:
-                await ctx.send("The bot is not playing anything at the moment.")
+                await ctx.send("The bot is not playing anything at \
+                               the moment.")
         except Exception as e:
             logging.error(f'An error occurred while skipping: {e}')
 
     @commands.command(name="queue", help="View the queue")
     @commands.check(guild_only)
     async def view_queue(self, ctx: commands.Context):
+        if len(self.queue) == 0:
+            await ctx.send("Queue is currently empty.")
+            return
+
         try:
             queue_items = [list(item) for item in self.queue.items()]
             output = t2a(header=["Queue No", "Song"],
-                        body=queue_items,
-                        first_col_heading=True)
+                         body=queue_items,
+                         first_col_heading=True)
             await ctx.send(f"Queue:\n```\n{output}\n```")
         except Exception as e:
             logging.error(f'An error occurred while viewing the queue: {e}')
 
-    @commands.command(name="move", help="Move song in the queue(queue no  queue postion)")
+    @commands.command(name="move", help="Move song in the queue(queue no queue position)")  # noqa
     @commands.check(guild_only)
-    async def move_song(self, ctx: commands.Context, queue_num: int, queue_pos: int):
+    async def move_song(self, ctx: commands.Context,
+                        queue_num: int, queue_pos: int):
         try:
             if queue_num == queue_pos:
                 await ctx.send("FUCK OFF GERALT!!!")
@@ -143,9 +154,11 @@ class JaskierGE(commands.Cog):
                     continue
                 queue_items.append(title)
             await self.repopulate_queue(queue_items)
-            await ctx.send("Moved " + str(self.queue[queue_pos]) + " to queue position: " + str(queue_pos))
+            await ctx.send("Moved " + str(self.queue[queue_pos]) +
+                           " to queue position: " + str(queue_pos))
         except Exception as e:
-            logging.error(f'An error occurred while moving a song in the queue: {e}')
+            logging.error(f'An error occurred while moving a song \
+                          in the queue: {e}')
 
     @commands.command(name="remove", help="Remove song in the queue(Song No)")
     @commands.check(guild_only)
@@ -163,7 +176,8 @@ class JaskierGE(commands.Cog):
             self.repopulate_queue(queue_items)
             await ctx.send("Removed " + removed_song + " from queue")
         except Exception as e:
-            logging.error(f'An error occurred while removing a song from the queue: {e}')
+            logging.error(f'An error occurred while removing a song \
+                          from the queue: {e}')
 
     # Event listener for the on_message event
     @commands.Cog.listener()
@@ -177,7 +191,8 @@ class JaskierGE(commands.Cog):
     @commands.Cog.listener()
     async def on_command_error(self, ctx, error):
         if isinstance(error, commands.CheckFailure):
-            await ctx.send("Sorry, you don't have permission to use this command.")
+            await ctx.send("Sorry, you don't have permission \
+                           to use this command.")
 
     # Helper Methods
     async def add_to_queue(self, ctx: commands.Context, title):
@@ -206,24 +221,29 @@ class JaskierGE(commands.Cog):
             ids = [*range(len(new_queue))]
             self.queue = dict(zip(ids, new_queue))
         except Exception as e:
-            logging.error(f'An error occurred while repopulating the queue: {e}')
+            logging.error(f'An error occurred while repopulating \
+                            the queue: {e}')
 
     async def play_next(self, ctx: commands.Context):
         try:
             if len(self.queue) > 0:
-                await self.remove_just_played()
                 url = self.queue[0]
                 async with ctx.typing():
-                    player = await YTDLSource.from_url(url, loop=self.bot.loop, stream=True)
-                    ctx.voice_client.play(player, after=lambda e:print('Player error: %s' % e)
-                                          if e else asyncio.run_coroutine_threadsafe(self.play_next(ctx), loop=self.bot.loop))
+                    player = await YTDLSource.from_url(url, loop=self.bot.loop,
+                                                       stream=True)
+                    ctx.voice_client.play(player,
+                                      after=lambda  # After audio is finished playing run the lambda function  # noqa
+                                      e: logging.error('Player error: %s' % e) if e  # Log error if it occurs  # noqa
+                                      else asyncio.run_coroutine_threadsafe(self.play_next(ctx), loop=self.bot.loop))  # noqa
                 await ctx.send('Now playing: {}'.format(player.title))
+                await self.remove_just_played()
             else:
-                await ctx.send("Queue is empty")
+                await ctx.send("Queue is currently empty")
         except Exception as e:
-            logging.error(f'An error occurred while playing the next song: {e}')
+            logging.error(f'An error occurred while playing the \
+                          next song: {e}')
 
-    #Tasks
+    # Tasks
     @tasks.loop(minutes=10) 
     async def check_inactivity(self):
         inactive_duration = datetime.utcnow() - self.last_interaction_time
@@ -231,7 +251,7 @@ class JaskierGE(commands.Cog):
             try:
                 for voice_channel in self.bot.voice_clients:
                     if voice_channel.is_connected():
-                        await self.bot.get_channel(self.channel_id).send("Bot has been inactive for too long, disconnecting now")
+                        await self.bot.get_channel(self.channel_id).send("Bot has been inactive for too long, disconnecting now")  # noqa
                         await voice_channel.disconnect()
             except Exception as e:
                 logging.error(f'Bot could not auto-disconnect: {e}')
