@@ -1,12 +1,15 @@
 from discord.ext import commands, tasks
 import discord
-from YTDLSource import YTDLSource
+
 import asyncio
 import ctypes
 import ctypes.util
 import logging  # Import the logging module
 from datetime import datetime, timedelta
 from table2ascii import table2ascii as t2a
+
+from YTDLSource import YTDLSource
+from musicqueue import MusicQueue
 
 # Configure logging
 logging.basicConfig(
@@ -18,6 +21,7 @@ logging.basicConfig(
 
 
 class JaskierGE(commands.Cog):
+    musicQueue = MusicQueue()
     queue = {}  # To store the song queue {("Queue No(int)" : "Title(str)")}
     current_id = 0  # Current index of song in the queue
     last_interaction_time = datetime.utcnow()  # Initialize with the current time (auto-updated upon message to bot)  # noqa
@@ -97,16 +101,15 @@ class JaskierGE(commands.Cog):
                 voice_client.resume()
             else:
                 await ctx.send("The bot was not playing anything before this.\
-                                Use play or stream command")
+                                Use play command")
         except Exception as e:
             logging.error(f'An error occurred while resuming: {e}')
 
     @commands.command(name='skip', help='Skip current song')
     @commands.check(guild_only)
-    async def stop(self, ctx: commands.Context):
+    async def skip(self, ctx: commands.Context):
         try:
             voice_client = ctx.message.guild.voice_client
-            JaskierGE.last_interaction_time = datetime.utcnow()  # Update the last interaction time  # noqa
             if voice_client.is_playing():
                 voice_client.stop()
             else:
@@ -135,9 +138,10 @@ class JaskierGE(commands.Cog):
     @commands.check(guild_only)
     async def move_song(self, ctx: commands.Context,
                         queue_num: int, queue_pos: int):
+        if queue_num == queue_pos:
+            await ctx.send("You are referencing the same song twice.")
+            return
         try:
-            if queue_num == queue_pos:
-                await ctx.send("You are referencing the same song twice.")
             queue_items = []
             for id, title in list(self.queue.items()):
                 if id == queue_pos:
@@ -163,7 +167,7 @@ class JaskierGE(commands.Cog):
     async def remove_song(self, ctx: commands.Context, song_num: int):
         try:
             if song_num > len(self.queue):
-                await ctx.send("FUCK OFF GERALT!!!")
+                await ctx.send("Number longer than queue length")
             queue_items = []
             removed_song = ""
             for id, title in list(self.queue.items()):
@@ -196,12 +200,35 @@ class JaskierGE(commands.Cog):
     # Helper Methods
     async def add_to_queue(self, ctx: commands.Context, title):
         try:
+            await self.musicQueue.add_to_queue(title)
             queuelen = len(self.queue)
             if queuelen >= 0:
                 self.queue[queuelen] = title
                 await ctx.send("Added to queue: {}".format(title))
         except Exception as e:
             logging.error(f'An error occurred while adding to the queue: {e}')
+
+    async def play_next(self, ctx: commands.Context):
+        try:
+            if self.musicQueue.queue_size() > 0:
+                songName = self.musicQueue.remove_next()
+
+            if len(self.queue) > 0:
+                url = self.queue[0]
+                async with ctx.typing():
+                    player = await YTDLSource.from_url(url, loop=self.bot.loop,
+                                                       stream=True)
+                    ctx.voice_client.play(player,
+                                      after=lambda  # After audio is finished playing run the lambda function  # noqa
+                                      e: logging.error('Player error: %s' % e) if e  # Log error if it occurs  # noqa
+                                      else asyncio.run_coroutine_threadsafe(self.play_next(ctx), loop=self.bot.loop))  # noqa
+                await ctx.send('Now playing: {}'.format(player.title))
+                await self.remove_just_played()
+            else:
+                await ctx.send("Queue is currently empty")
+        except Exception as e:
+            logging.error(f'An error occurred while playing the \
+                          next song: {e}')
 
     async def remove_just_played(self):
         try:
@@ -223,25 +250,6 @@ class JaskierGE(commands.Cog):
             logging.error(f'An error occurred while repopulating \
                             the queue: {e}')
 
-    async def play_next(self, ctx: commands.Context):
-        try:
-            if len(self.queue) > 0:
-                url = self.queue[0]
-                async with ctx.typing():
-                    player = await YTDLSource.from_url(url, loop=self.bot.loop,
-                                                       stream=True)
-                    ctx.voice_client.play(player,
-                                      after=lambda  # After audio is finished playing run the lambda function  # noqa
-                                      e: logging.error('Player error: %s' % e) if e  # Log error if it occurs  # noqa
-                                      else asyncio.run_coroutine_threadsafe(self.play_next(ctx), loop=self.bot.loop))  # noqa
-                await ctx.send('Now playing: {}'.format(player.title))
-                await self.remove_just_played()
-            else:
-                await ctx.send("Queue is currently empty")
-        except Exception as e:
-            logging.error(f'An error occurred while playing the \
-                          next song: {e}')
-
     async def join_server(self, ctx):
         try:
             channel = ctx.message.author.voice.channel
@@ -252,7 +260,7 @@ class JaskierGE(commands.Cog):
             logging.error(f'User is not connected to a voice channel: {e}')
 
     # Tasks
-    @tasks.loop(minutes=10) 
+    @tasks.loop(minutes=10)
     async def check_inactivity(self):
         inactive_duration = datetime.utcnow() - self.last_interaction_time
         if inactive_duration > timedelta(minutes=30):
