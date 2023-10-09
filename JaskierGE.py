@@ -33,13 +33,7 @@ class JaskierGE(commands.Cog):
 
     @commands.command(name="join", help="Command to make the bot join the server which the user is connected to")  # noqa
     async def join(self, ctx: commands.Context):
-        try:
-            channel = ctx.message.author.voice.channel
-            self.channel_id = channel.id
-            await channel.connect()
-        except Exception as e:
-            await ctx.send("You are not connected to a voice channel")
-            logging.error(f'User is not connected to a voice channel: {e}')
+        await self.join_server(ctx)
 
     @commands.command(name="leave", help="Command to make the bot leave the server")  # noqa
     @commands.check(guild_only)
@@ -57,6 +51,10 @@ class JaskierGE(commands.Cog):
     @commands.command(name="play", help="Command to play a song or add a song to queue if song is already playing\nUsage: /play (youtube-link/song-name)")  # noqa
     @commands.check(guild_only)
     async def play(self, ctx: commands.Context, *, url):
+        # Check if bot is connected to a voice channel, if not join one first
+        if len(self.bot.voice_clients) == 0:
+            await self.join_server(ctx)
+
         try:
             ctypes.util.find_library('opus')
         except Exception as e:
@@ -139,7 +137,7 @@ class JaskierGE(commands.Cog):
                         queue_num: int, queue_pos: int):
         try:
             if queue_num == queue_pos:
-                await ctx.send("FUCK OFF GERALT!!!")
+                await ctx.send("You are referencing the same song twice.")
             queue_items = []
             for id, title in list(self.queue.items()):
                 if id == queue_pos:
@@ -188,6 +186,7 @@ class JaskierGE(commands.Cog):
         else:
             self.last_interaction_time = datetime.utcnow()
 
+    # Error message handle for CheckFailure error
     @commands.Cog.listener()
     async def on_command_error(self, ctx, error):
         if isinstance(error, commands.CheckFailure):
@@ -242,6 +241,15 @@ class JaskierGE(commands.Cog):
         except Exception as e:
             logging.error(f'An error occurred while playing the \
                           next song: {e}')
+
+    async def join_server(self, ctx):
+        try:
+            channel = ctx.message.author.voice.channel
+            self.channel_id = channel.id
+            await channel.connect()
+        except Exception as e:
+            await ctx.send("You are not connected to a voice channel")
+            logging.error(f'User is not connected to a voice channel: {e}')
 
     # Tasks
     @tasks.loop(minutes=10) 
