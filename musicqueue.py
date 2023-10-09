@@ -13,7 +13,6 @@ logging.basicConfig(
 
 class MusicQueue():
     queue = deque()
-    current_index = 0  # Index of song currently playing (default is 0)
 
     # View a text output of the queue
     def view_queue(self):
@@ -28,7 +27,7 @@ class MusicQueue():
         output = t2a(header=["Queue No", "Song"],
                      body=list(queue_dict.items()),
                      first_col_heading=True)
-        
+
         return (f"Queue:\n```\n{output}\n```")
 
     # Add song to queue
