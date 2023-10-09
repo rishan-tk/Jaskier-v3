@@ -116,8 +116,8 @@ class JaskierGE(commands.Cog):
     @commands.check(guild_only)
     async def move_song(self, ctx: commands.Context,
                         song_index: int, new_pos: int):
-        new_pos -= 1
-        song_index -= 1
+        new_pos -= 1  # Numbers shown to user are larger by 1
+        song_index -= 1  # Numbers shown to user are larger by 1
 
         try:
             if song_index == new_pos:
