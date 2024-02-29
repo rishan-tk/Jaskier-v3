@@ -64,7 +64,7 @@ class MusicQueue():
     def move_song_s(self, newindex, songname):
         # Get the index of the song with matching name
         songindex = self.queue.index(songname)
-        self.move_song(songindex, newindex)
+        return self.move_song(songindex, newindex)
 
     def move_song(self, songindex, newindex):
         if songindex > self.size() or songindex < 0 \

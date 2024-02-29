@@ -27,6 +27,7 @@ class JaskierGE(commands.Cog):
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+        self.guild_activity = {}
         self.check_inactivity.start()
 
     def guild_only(ctx):
@@ -156,8 +157,11 @@ class JaskierGE(commands.Cog):
         # Update the last interaction time
         if message.author == self.bot.user:
             return
-        else:
-            self.last_interaction_time = datetime.utcnow()
+        
+        self.guild_activity[message.guild.id] = {
+            'last_interaction_time': datetime.utcnow(),
+            'channel_id': message.channel.id
+        }
 
     # Error message handle for CheckFailure error
     @commands.Cog.listener()
@@ -214,14 +218,23 @@ class JaskierGE(commands.Cog):
     @tasks.loop(minutes=10)
     async def check_inactivity(self):
         inactive_duration = datetime.utcnow() - self.last_interaction_time
-        if inactive_duration > timedelta(minutes=30):
-            try:
-                for voice_channel in self.bot.voice_clients:
-                    if voice_channel.is_connected():
-                        await self.bot.get_channel(self.channel_id).send("Bot has been inactive for too long, disconnecting now")  # noqa
-                        await voice_channel.disconnect()
-            except Exception as e:
-                logging.error(f'Bot could not auto-disconnect: {e}')
+        for guild_id, activity in list(self.guild_activity.items()):
+            last_interaction = activity['last_interaction_time']
+            channel_id = activity['channel_id']
+            if inactive_duration > timedelta(minutes=30):
+                guild = self.bot.get_guild(guild_id)
+                if guild and guild.voice_client and guild.voice_client.is_connected():
+                    try:
+                        # Attempt to send a message to the channel where the last interaction took place
+                        channel = self.bot.get_channel(channel_id)
+                        if channel:
+                            await channel.send("Bot has been inactive for too long, disconnecting now.")
+                        await guild.voice_client.disconnect()
+                    except Exception as e:
+                        logging.error(f'Bot could not auto-disconnect from guild {guild_id}: {e}')
+                    finally:
+                        # Optionally remove the guild from activity tracking
+                        del self.guild_activity[guild_id]
 
 
 async def setup(bot: commands.Bot):
