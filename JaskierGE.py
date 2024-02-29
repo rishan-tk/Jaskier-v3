@@ -22,8 +22,6 @@ logging.basicConfig(
 
 class JaskierGE(commands.Cog):
     musicQueue = MusicQueue()
-    last_interaction_time = datetime.utcnow()  # Initialize with the current time (auto-updated upon message to bot)  # noqa
-    channel_id = ""
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -163,6 +161,8 @@ class JaskierGE(commands.Cog):
             'channel_id': message.channel.id
         }
 
+        await self.bot.process_commands(message)
+
     # Error message handle for CheckFailure error
     @commands.Cog.listener()
     async def on_command_error(self, ctx, error):
@@ -208,8 +208,12 @@ class JaskierGE(commands.Cog):
     async def join_server(self, ctx):
         try:
             channel = ctx.message.author.voice.channel
-            self.channel_id = channel.id
             await channel.connect()
+            # Update guild activity to reflect the new voice channel connection
+            self.guild_activity[ctx.guild.id] = {
+                'last_interaction_time': datetime.utcnow(),
+                'channel_id': ctx.channel.id  # This tracks the text channel, not voice channel; consider if this meets your needs
+            }
         except Exception as e:
             await ctx.send("You are not connected to a voice channel")
             logging.error(f'User is not connected to a voice channel: {e}')
@@ -217,11 +221,11 @@ class JaskierGE(commands.Cog):
     # Tasks
     @tasks.loop(minutes=10)
     async def check_inactivity(self):
-        inactive_duration = datetime.utcnow() - self.last_interaction_time
+        current_time = datetime.utcnow()
         for guild_id, activity in list(self.guild_activity.items()):
-            last_interaction = activity['last_interaction_time']
+            inactive_duration = current_time - activity['last_interaction_time']
             channel_id = activity['channel_id']
-            if inactive_duration > timedelta(minutes=30):
+            if inactive_duration > timedelta(minutes=10):
                 guild = self.bot.get_guild(guild_id)
                 if guild and guild.voice_client and guild.voice_client.is_connected():
                     try:
