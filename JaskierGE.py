@@ -225,7 +225,7 @@ class JaskierGE(commands.Cog):
         for guild_id, activity in list(self.guild_activity.items()):
             inactive_duration = current_time - activity['last_interaction_time']
             channel_id = activity['channel_id']
-            if inactive_duration > timedelta(minutes=10):
+            if inactive_duration > timedelta(minutes=30):
                 guild = self.bot.get_guild(guild_id)
                 if guild and guild.voice_client and guild.voice_client.is_connected():
                     try:
