@@ -58,7 +58,6 @@ class JaskierGE(commands.Cog):
 
             # Check if the URL is a YouTube playlist
         if "youtube.com/playlist?list=" in url:
-            print("Playing playlist")
             await self.handle_playlist(ctx, url)
         else:
             # Existing logic for a single song
@@ -191,8 +190,11 @@ class JaskierGE(commands.Cog):
             logging.error(f'An error occurred while playing: {e}')
 
     async def handle_playlist(self, ctx, playlist_url):
+        print("here")
         with YTDLSource as ydl:
+            print("here2")
             try:
+                print("here3")
                 playlist_dict = ydl.extract_info(playlist_url, download=False)
                 print(playlist_dict)
                 if 'entries' in playlist_dict:
