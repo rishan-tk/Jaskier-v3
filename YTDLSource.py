@@ -56,5 +56,15 @@ class YTDLSource(discord.PCMVolumeTransformer):
         except Exception as e:
             print(f"Failed to download info from url {url} with error: {e}")
             return None
+        
+    @classmethod
+    async def extract_info(cls, url, download=False, loop=None):
+        loop = loop or asyncio.get_event_loop()
+        try:
+            data = await loop.run_in_executor(None, lambda: ytdl.extract_info(url, download=download))
+            return data
+        except Exception as e:
+            print(f"Failed to extract info from url {url} with error: {e}")
+            return None
 
     # ./ffmpeg.exe on windows
