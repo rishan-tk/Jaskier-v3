@@ -155,13 +155,6 @@ class JaskierGE(commands.Cog):
         
         await self.bot.process_commands(message)
 
-    # Error message handle for CheckFailure error
-    @commands.Cog.listener()
-    async def on_command_error(self, ctx, error):
-        if isinstance(error, commands.CheckFailure):
-            await ctx.send("Sorry, you don't have permission \
-                           to use this command.")
-
     # Helper Methods
     async def add_to_queue(self, ctx: commands.Context, title):
         try:
