@@ -194,7 +194,7 @@ class JaskierGE(commands.Cog):
         try:
             print("here2")
             async with ctx.typing():
-                playlist_dict = YTDLSource.extract_info(playlist_url, download=False)
+                playlist_dict = await self.bot.loop.run_in_executor(None, lambda: YTDLSource.extract_info(playlist_url, download=False))
                 print(playlist_dict)
                 if 'entries' in playlist_dict:
                     for video in playlist_dict['entries']:
