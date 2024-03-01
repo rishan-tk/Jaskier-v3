@@ -191,7 +191,7 @@ class JaskierGE(commands.Cog):
 
     async def handle_playlist(self, ctx, playlist_url):
         print("here")
-        with YTDLSource as ydl:
+        async with YTDLSource as ydl:
             print("here2")
             try:
                 print("here3")
