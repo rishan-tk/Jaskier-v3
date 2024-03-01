@@ -58,6 +58,7 @@ class JaskierGE(commands.Cog):
 
             # Check if the URL is a YouTube playlist
         if "youtube.com/playlist?list=" in url:
+            print("Playing playlist")
             await self.handle_playlist(ctx, url)
         else:
             # Existing logic for a single song
@@ -70,9 +71,6 @@ class JaskierGE(commands.Cog):
             voice_client = ctx.message.guild.voice_client
             if voice_client.is_playing():
                 voice_client.pause()
-            else:
-                await ctx.send("The bot is not playing anything at \
-                               the moment.")
         except Exception as e:
             logging.error(f'An error occurred while pausing: {e}')
 
@@ -96,9 +94,6 @@ class JaskierGE(commands.Cog):
             voice_client = ctx.message.guild.voice_client
             if voice_client.is_playing():
                 voice_client.stop()
-            else:
-                await ctx.send("The bot is not playing anything at \
-                               the moment.")
         except Exception as e:
             logging.error(f'An error occurred while skipping: {e}')
 
