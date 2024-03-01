@@ -56,13 +56,12 @@ class JaskierGE(commands.Cog):
         if len(self.bot.voice_clients) == 0:
             await self.join_server(ctx)
 
-        try:
-            ctypes.util.find_library('opus')
-        except Exception as e:
-            if not discord.opus.is_loaded():
-                logging.error(f'Opus failed to load: {e}')
-
-        await self.play_song(ctx, url)
+            # Check if the URL is a YouTube playlist
+        if "youtube.com/playlist?list=" in url:
+            await self.handle_playlist(ctx, url)
+        else:
+            # Existing logic for a single song
+            await self.play_song(ctx, url)
 
     @commands.command(name='pause', help='This command pauses the song')
     @commands.check(guild_only)
@@ -154,13 +153,11 @@ class JaskierGE(commands.Cog):
     async def on_message(self, message):
         # Update the last interaction time
         if message.author == self.bot.user:
-            return
+            self.guild_activity[message.guild.id] = {
+                'last_interaction_time': datetime.utcnow(),
+                'channel_id': message.channel.id
+            }
         
-        self.guild_activity[message.guild.id] = {
-            'last_interaction_time': datetime.utcnow(),
-            'channel_id': message.channel.id
-        }
-
         await self.bot.process_commands(message)
 
     # Error message handle for CheckFailure error
@@ -205,7 +202,29 @@ class JaskierGE(commands.Cog):
         except Exception as e:
             logging.error(f'An error occurred while playing: {e}')
 
+    async def handle_playlist(self, ctx, playlist_url):
+        with YTDLSource as ydl:
+            try:
+                playlist_dict = ydl.extract_info(playlist_url, download=False)
+                if 'entries' in playlist_dict:
+                    for video in playlist_dict['entries']:
+                        # Assuming you want the song title for user feedback and queue management
+                        song_title = video.get('title')
+                        await self.musicQueue.add_to_queue(song_title)  # Queue by title
+                    await ctx.send(f"Added {len(playlist_dict['entries'])} songs from the playlist to the queue.")
+                else:
+                    await ctx.send("Could not retrieve any songs from the playlist.")
+            except Exception as e:
+                await ctx.send("An error occurred while processing the playlist.")
+                logging.error(f'Error processing playlist {playlist_url}: {e}')
+
     async def join_server(self, ctx):
+        try:
+            ctypes.util.find_library('opus')
+        except Exception as e:
+            if not discord.opus.is_loaded():
+                logging.error(f'Opus failed to load: {e}')
+
         try:
             channel = ctx.message.author.voice.channel
             await channel.connect()
@@ -214,6 +233,7 @@ class JaskierGE(commands.Cog):
                 'last_interaction_time': datetime.utcnow(),
                 'channel_id': ctx.channel.id  # This tracks the text channel, not voice channel; consider if this meets your needs
             }
+
         except Exception as e:
             await ctx.send("You are not connected to a voice channel")
             logging.error(f'User is not connected to a voice channel: {e}')
