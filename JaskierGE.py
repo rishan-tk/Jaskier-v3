@@ -191,34 +191,32 @@ class JaskierGE(commands.Cog):
 
     async def handle_playlist(self, ctx, playlist_url):
         print("here")
-        async with YTDLSource as ydl:
+        try:
             print("here2")
-            try:
-                print("here3")
-                playlist_dict = ydl.extract_info(playlist_url, download=False)
+            async with ctx.typing():
+                playlist_dict = YTDLSource.extract_info(playlist_url, download=False)
                 print(playlist_dict)
                 if 'entries' in playlist_dict:
                     for video in playlist_dict['entries']:
                         # Assuming you want the song title for user feedback and queue management
                         song_title = video.get('title')
                         try:
-                            async with ctx.typing():
-                                player = await YTDLSource.from_url(song_title,
-                                                                loop=self.bot.loop,
-                                                                stream=True)
-                                ctx.voice_client.play(player,
-                                                    after=lambda  # After audio is finished playing run the lambda function  # noqa
-                                                    e: logging.error('Player error: %s' % e) if e  # Log error if it occurs  # noqa
-                                                    else asyncio.run_coroutine_threadsafe(self.play_next(ctx), loop=self.bot.loop))  # noqa
-                                await ctx.send('Now playing: {}'.format(player.title))
+                            player = await YTDLSource.from_url(song_title,
+                                                            loop=self.bot.loop,
+                                                            stream=True)
+                            ctx.voice_client.play(player,
+                                                after=lambda  # After audio is finished playing run the lambda function  # noqa
+                                                e: logging.error('Player error: %s' % e) if e  # Log error if it occurs  # noqa
+                                                else asyncio.run_coroutine_threadsafe(self.play_next(ctx), loop=self.bot.loop))  # noqa
+                            await ctx.send('Now playing: {}'.format(player.title))
                         except discord.ClientException as e:
                             await self.add_to_queue(ctx, player.title[:50])
                     await ctx.send(f"Added {len(playlist_dict['entries'])} songs from the playlist to the queue.")
                 else:
                     await ctx.send("Could not retrieve any songs from the playlist.")
-            except Exception as e:
-                await ctx.send("An error occurred while processing the playlist.")
-                logging.error(f'Error processing playlist {playlist_url}: {e}')
+        except Exception as e:
+            await ctx.send("An error occurred while processing the playlist.")
+            logging.error(f'Error processing playlist {playlist_url}: {e}')
 
     async def join_server(self, ctx):
         try:
