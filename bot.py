@@ -16,7 +16,7 @@ bot = commands.Bot(command_prefix='/', intents=intents)
 async def run():
     async with bot:
         await bot.load_extension("JaskierGE")
-        await bot.load_extension("ErrorHandler")
+        #await bot.load_extension("ErrorHandler")
         print("Jaskier Loaded")
         await bot.start(DISCORD_TOKEN)
 
